@@ -5,10 +5,11 @@
 // WARNING! You are about to see some very hack-y, badly written code. Sorry to anybody trying to contribute to this mess!
 // I'll fix it later, I promise (:
 
-#include "include/parseBootRecord.h"
-#include "../drivers/include/disk.h"
-#include "../utils/include/binop.h"
-#include "../utils/include/string.h"
+#include "parseBootRecord.h"
+#include "../drivers/disk.h"
+#include "../drivers/terminalWrite.h"
+#include "../utils/binop.h"
+#include "../utils/string.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

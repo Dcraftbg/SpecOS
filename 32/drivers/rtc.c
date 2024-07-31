@@ -1,12 +1,8 @@
-/* RTC driver for the SpecOS kernel project.
- * Copyright (C) 2024 Jake Steinburger under the MIT license. See the GitHub repo for more information.
- */
-
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include "include/rtc.h"
-#include "../utils/include/io.h"
+#include "rtc.h"
+#include "../utils/inx.h"
 
 enum {
       cmos_address = 0x70,

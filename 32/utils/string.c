@@ -1,10 +1,5 @@
-/* Basic kernelspace-only string utility "library"
- * (quoted cos it's literally one file lol)
- * Copyright (C) 2024 Jake Steinburger under the MIT license. See the GitHub repo for more information.
- */
-
-
-#include "include/string.h"
+#include "string.h"
+#include "../drivers/terminalWrite.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -18,15 +13,6 @@ size_t strlen(const char* str)
     return len;
 }
 
-bool strcmp(const char* str1, const char* str2) {
-    int str1len = strlen(str1);
-    int str2len = strlen(str2);
-    if (str1len != str2len) return false;
-    for (int c = 0; c < str1len && c < str2len; c++) {
-        if (str1[c] != str2[c]) return false;
-    }
-    return true;
-}
 
 void memset(uint8_t *array, uint8_t value, size_t size) {
     for (size_t i = 0; i < size; i++) {
@@ -123,60 +109,13 @@ void uint32_to_hex_string(uint32_t num, char *str) {
     }
 }
 
-void uint64_to_hex_string(uint64_t num, char *str) {
-    // Define a buffer large enough to hold the maximum uint64_t value in hex
-    char buffer[17];  // Max length of uint64_t in hex is 16 digits, plus null terminator
-    // Index to fill the buffer
-    int index = 0;
-
-    // Special case for zero
-    if (num == 0) {
-        buffer[index++] = '0';
-    } else {
-        // Extract hex digits from least significant to most significant
-        while (num > 0) {
-            uint8_t digit = num & 0xF;  // Get the least significant 4 bits (a hex digit)
-            if (digit < 10) {
-                buffer[index++] = '0' + digit;  // Convert digit to character
-            } else {
-                buffer[index++] = 'A' + (digit - 10);  // Convert digit to character
-            }
-            num >>= 4;  // Shift right by 4 bits to get the next hex digit
-        }
-    }
-    // Null-terminate the buffer
-    buffer[index] = '\0';
-    // Reverse the buffer
-    reverse(buffer, index);
-    // Copy the reversed buffer to the output string (str)
-    for (int i = 0; i <= index; ++i) {
-        str[i] = buffer[i];
-    }
-}
-
-
-int get_num_length(uint64_t num) {
+int get_num_length(uint32_t num) {
     int length = 0;
     do {
         length++;
         num /= 10;
     } while (num > 0);
     return length;
-}
-
-void uint64_to_string(uint64_t num, char* str) {
-    // Get the length of the number
-    int length = get_num_length(num);
-
-    // Null-terminate the string
-    str[length] = '\0';
-
-    // Fill the buffer with digits in reverse order
-    int index = length - 1;
-    do {
-        str[index--] = '0' + (num % 10);
-        num /= 10;
-    } while (num > 0);
 }
 
 void uint32_to_string(uint32_t num, char* str) {
@@ -269,4 +208,3 @@ char* charToStr(char character) {
     wholeStr[1] = '\0';
     return wholeStr;
 }
-

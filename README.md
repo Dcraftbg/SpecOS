@@ -4,15 +4,15 @@
 ![GitHub top language](https://img.shields.io/github/languages/top/jakeSteinburger/SpecOS?logo=c&label=)
 [![GitHub license](https://img.shields.io/github/license/jakeSteinburger/SpecOS)](https://github.com/jakeSteinburger/SpecOS/blob/main/LICENSE)
 
-An x86 OS kernel from scratch.
+An x86-64 OS kernel from scratch.
 
 > **NOTE**
 > 
 > This project is still in very early stages, and should NOT be used on real hardware. The code is quite messy and is currently a series of messy C files. Seriously, don't learn anything from this project.
 
-SpecOS is a 32 bit operating system kernel for x86 processors, still in quite early stages, written in (questionable quality) C. It is (not very) powerful.
+SpecOS is a 64 bit operating system kernel for x86-64 processors, still in quite early stages, written in (questionable quality) C. It is (not very) powerful.
 
-A 64 bit version of SpecOS (x86-64) is in development, and will soon be the main version of SpecOS.
+This used to be 32 bit, but has been transferred to a 64 bit operating system.
 
 It uses a monolithic kernel, because I like having everything in one place. This may take some inspiration from other operating systems, but it is **not UNIX based**. 
 
@@ -26,7 +26,7 @@ This works best on Linux (Mac should also be fine). If you're using Windows, it'
 Make sure that you have GCC, NASM and Qemu installed, as well as the i686-elf toolkit. This is easy to install with Brew (I even used Brew on Linux). Then simply clone the repo, cd into it, make `compile.sh` runnable and run the script:
 ```
 git clone https://github.com/jakeSteinburger/SpecOS.git
-cd SpecOS/scripts
+cd SpecOS
 chmod +x compile.sh
 ./compile.sh
 ```
@@ -37,15 +37,15 @@ This will generate a an executable disk image that you can run with qemu.
 ### On Qemu
 Simply cd into the directory of the built .img file, and run:
 ```
-qemu-system-i386 disk.img
+qemu-system-x86_64 disk.img
 ```
 You'll obviously need Qemu installed.
 
 ### On real hardware
-This is ***not recommended***, and it has ***not been tested***, however you're welcome to give it a shot. In the directory of the .bin file, run:
+This is ***not recommended***, and it has ***not been tested***, however you're welcome to give it a shot. In the directory of the .img file, run:
 
 ```
-sudo dd if=SpecOS/scripts/disk.img of=/dev/sdN bs=4M status=progress
+sudo dd if=disk.img of=/dev/sdN bs=4M status=progress
 ```
 
 With /dev/sdN being the name of your USB. Then in your device's unique BIOS, change the boot order so it will boot from USB before your current OS, and restart with your now-formatted USB plugged in.
@@ -73,7 +73,7 @@ Some things that I gotta do, and some things that I have done, in SpecOS. Yeah, 
   - [X] Draw text to graphical framebuffer provided by limine
   - [X] Port to 64 bit version (FAT, RTC, hard disk driver, keyboard)
   - [X] Detect memory with limine
-  - [ ] Re-write PMM to use bitmap instead of pooling
+  - [X] Re-write PMM to use bitmap instead of pooling
   - [ ] Re-write 64 bit version of paging
 - [ ] Jump to userspace (apps are a big milestone for me!)
 - [ ] Write libc (maybe port one? I don't really know yet.)
@@ -101,3 +101,9 @@ Some things that I gotta do, and some things that I have done, in SpecOS. Yeah, 
 It's a road to running DOOM!
 
 Note that a lot of this is unrealistic and probably won't happen - it's a lot easier said that done. But my hopes are high (:
+
+## Special thanks
+You didn't *really* think that *I* could do this alone of all people, did you? I'm not a genius! Thank you so, so much to these people who have made my journey in operating system development so much easier!
+
+ - [Bananymous](https://github.com/Bananymous) is a super smart guy, who taught me a *ton*. He also wrote the amazing [Banan-OS](https://github.com/Bananymous/banan-os)!
+ - [Dcraftbg](https://github.com/Dcraftbg) has taught me a whole lot about paging and a few other topics. He also just managed to enter userspace on his [MinOS](https://github.com/Dcraftbg/MinOS), nice one :D

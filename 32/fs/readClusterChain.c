@@ -6,11 +6,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "include/readClusterChain.h"
-#include "include/parseBootRecord.h"
-#include "../drivers/include/disk.h"
-#include "../utils/include/string.h"
-#include "../utils/include/binop.h"
+#include "readClusterChain.h"
+#include "parseBootRecord.h"
+#include "../drivers/disk.h"
+#include "../utils/string.h"
+#include "../drivers/terminalWrite.h"
+#include "../utils/binop.h"
 
 unsigned int getNextCluster(int currentCluster) {
     uint16_t firstFatSector = readBoot().reservedSectCount;
@@ -39,13 +40,10 @@ uint32_t getFirstSectorOfCluster(int clust) {
     return (((clust - 2) * bpb.sectPerClust) + firstDataSect) + 2048;
 }
 
-// returns status - is file too big?
-int readFile(int firstClust, char buffer[1000000]) {
+void readFile(int firstClust, char* buffer) {
     int i = 0;
     int currentClust = firstClust;
     while (1) {
-        if (i > 1000000)
-            return 1;
         char* thisSectContents = readdisk(getFirstSectorOfCluster(currentClust));
         for (int j = 0; j < 512; j++) {
             buffer[i + j] = thisSectContents[j];
@@ -59,5 +57,4 @@ int readFile(int firstClust, char buffer[1000000]) {
     buffer[i] = 4;
     buffer[i + 1] = 0;
     buffer[i + 2] = 4;
-    return 0;
 } 

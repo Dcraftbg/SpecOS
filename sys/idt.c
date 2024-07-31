@@ -1,96 +1,43 @@
-#include <stdbool.h>
-#include <stddef.h>
+/* 64 bit IDT implementation for the SpecOS kernel project.
+ * Copyright (C) 2024 Jake Steinburger under the MIT license. See the GitHub repository for more information.
+ */
+
 #include <stdint.h>
-#include "idt.h"
-#include "gdt.h"
-#include "../utils/inx.h"
-#include "../kernel.h"
-#include "../drivers/terminalWrite.h"
+#include <stddef.h>
+#include <stdbool.h>
 
-#define IDT_MAX_DESCRIPTORS 32 // or whatever value you intend to use
-bool vectors[IDT_MAX_DESCRIPTORS] = {false};
-typedef struct {
-    uint16_t    isr_low;      // The lower 16 bits of the ISR's address
-    uint16_t    kernel_cs;    // The GDT segment selector that the CPU will load into CS before calling the ISR
-    uint8_t     reserved;     // Set to zero
-    uint8_t     attributes;   // Type and attributes; see the IDT page
-    uint16_t    isr_high;     // The higher 16 bits of the ISR's address
-} __attribute__((packed)) idt_entry_t;
+#include "include/panic.h"
+#include "../drivers/include/keyboard.h"
+#include "include/idt.h"
+#include "../drivers/include/vga.h"
+#include "../utils/include/io.h"
+#include "include/exceptions.h"
+#include "../include/kernel.h"
 
-__attribute__((aligned(0x10)))
-static idt_entry_t idt[256]; // Create an array of IDT entries; aligned for performance
+// and the thingies to make it do stuff
 
-typedef struct {
-    uint16_t    limit;
-    uint32_t    base;
-} __attribute__((packed)) idtr_t;
+void initIRQ();
 
-static idtr_t idtr;
-
-void (*isr_stub_table[34])() = {
-    NULL
-};
-
-void idt_set_descriptor(uint8_t vector, void (*isr)(), uint8_t flags) {
-    isr_stub_table[vector] = isr;
-    idt[vector].isr_low = (uint32_t)isr & 0xFFFF;
-    idt[vector].kernel_cs = 0x08;
-    idt[vector].reserved = 0;
-    idt[vector].attributes = flags | 0x60;
-    idt[vector].isr_high = ((uint32_t)isr >> 16) & 0xFFFF;
+// takes: IDT vector number (eg. 0x01 for divide by 0 exception), a pointer to an ISR (aka the function it calls), & the flags
+void idtSetDescriptor(uint8_t vect, void* isrThingy, uint8_t gateType, uint8_t dpl) {
+    struct IDTEntry* thisEntry = &kernel.idt[vect];
+    // set the thingies
+    // isr offset
+    thisEntry->offset1 = (uint64_t)isrThingy & 0xFFFF; // first 16 bits
+    thisEntry->offset2 = ((uint64_t)isrThingy >> 16) & 0xFFFF; // next 16 bits (I think? not sure if this is wrong)
+    thisEntry->offset3 = ((uint64_t)isrThingy >> 32) & 0xFFFFFFFF; // next 32 bits (again, not sure if i did that right.)
+    // gdt segment
+    thisEntry->segmentSelector = 0x08; // addresses kernel mode code segment in gdt
+    // some "flags". idk why the wiki calls these flags tbh.
+    thisEntry->ist = 0; // idk what this should be but apparently it can just be 0
+    thisEntry->gateType = gateType; // Trap or interrupt gate?
+    thisEntry->dpl = dpl;
+    thisEntry->present = 1;
 }
 
-void isr_divide_by_zero() {
-    terminal_setcolor(VGA_COLOR_RED);
-    terminal_writestring("EXCEPTION: Divide by zero\n");
-    __asm__("cli; hlt");
-}
+// define more stuff for PIC (hardware, yay!)
 
-void isr_invalid_opcode() {
-    terminal_setcolor(VGA_COLOR_RED);
-    terminal_writestring("EXCEPTION: Invalid opcode\n");
-    __asm__("cli; hlt");
-}
-
-void isr_page_fault() {
-    terminal_setcolor(VGA_COLOR_RED);
-    terminal_writestring("EXCEPTION: Page fault\n");
-    __asm__("cli; hlt");
-}
-
-void isr_stub_divide_by_zero() {
-    // Push error code and call the actual ISR
-    asm volatile("push $0");
-    asm volatile("jmp isr_divide_by_zero");
-}
-
-void isr_stub_invalid_opcode() {
-    // Push error code and call the actual ISR
-    asm volatile("push $0");
-    asm volatile("jmp isr_invalid_opcode");
-}
-
-void isr_stub_page_fault() {
-    // Push error code and call the actual ISR
-    asm volatile("push $0");
-    asm volatile("jmp isr_page_fault");
-}
-
-void test_helloworld_syscall() {
-    terminal_writestring("\nHello, world!\n");
-}
-
-void idt_init() {
-    idtr.limit = sizeof(idt) - 1;
-    idtr.base = (uint32_t)&idt;
-    idt_set_descriptor(0, isr_divide_by_zero, 0x8E);
-    idt_set_descriptor(6, isr_invalid_opcode, 0x8E);
-    idt_set_descriptor(14, isr_page_fault, 0x8E);
-    idt_set_descriptor(0x80, test_helloworld_syscall, 0x8E);
-    __asm__("lidt %0" : : "m"(idtr));
-}
-
-void remap_PIC() {
+void remapPIC() {
     // ICW1: Start initialization of PIC
     outb(0x20, 0x11); // Master PIC
     outb(0xA0, 0x11); // Slave PIC
@@ -113,9 +60,50 @@ void remap_PIC() {
     outb(0xA1, 0xFF);
 }
 
-void init_IRQ() {
-    remap_PIC();
-    idt_set_descriptor(33, isr_keyboard, 0x8E); // Map IRQ 1 (keyboard) to vector 33
-    outb(0x21, ~(1 << 1)); // Unmask IRQ 1 (keyboard)
-    __asm__("sti");
+// stuff to set it all up
+void initIRQ() {
+    remapPIC();
+    // map some stuff
+    idtSetDescriptor(33, &isr_keyboard, 14, 0); 
+    outb(0x21, ~(1 << 1)); // unmask keyboard IRQ 
+    // all the exceptions
+    idtSetDescriptor(0, &divideErrorISR, 15, 0);
+    idtSetDescriptor(1, &debugExceptionISR, 15, 0);
+    idtSetDescriptor(2, &nmiInterruptISR, 15, 0);
+    idtSetDescriptor(3, &breakpointISR, 15, 0);
+    idtSetDescriptor(4, &overflowISR, 15, 0);
+    idtSetDescriptor(5, &boundRangeExceededISR, 15, 0);
+    idtSetDescriptor(6, &invalidOpcodeISR, 15, 0);
+    idtSetDescriptor(7, &deviceNotAvailableISR, 15, 0);
+    idtSetDescriptor(8, &doubleFaultISR, 15, 0);
+    idtSetDescriptor(9, &coprocessorSegmentOverrunISR, 15, 0);
+    idtSetDescriptor(10, &invalidTSSISR, 15, 0);
+    idtSetDescriptor(11, &segmentNotPresentISR, 15, 0);
+    idtSetDescriptor(12, &stackSegmentFaultISR, 15, 0);
+    idtSetDescriptor(13, &generalProtectionFaultISR, 15, 0);
+    idtSetDescriptor(14, &pageFaultISR, 15, 0);
+    idtSetDescriptor(16, &x87FPUErrorISR, 15, 0);
+    idtSetDescriptor(17, &alignmentCheckISR, 15, 0);
+    idtSetDescriptor(18, &machineCheckISR, 15, 0);
+    idtSetDescriptor(19, &simdFloatingPointExceptionISR, 15, 0);
+    idtSetDescriptor(20, &virtualizationExceptionISR, 15, 0);
+    idtSetDescriptor(30, &securityExceptionISR, 15, 0);
+    asm("sti");
 }
+
+void initIDT() {
+    writestring("\nSetting IDT descriptors..."); 
+    writestring("\nCreating IDTR (that IDT pointer thingy)...");
+    kernel.IDTPtr.offset = (uintptr_t)&kernel.idt[0];
+    kernel.IDTPtr.size = ((uint16_t)sizeof(struct IDTEntry) *  256) - 1;
+    writestring("\nLoading IDTR into the register thingy...");
+    asm volatile("lidt %0" : : "m"(kernel.IDTPtr));
+    writestring("\nSetting up IRQ hardware thingy...");
+    initIRQ();
+}
+
+
+
+
+
+

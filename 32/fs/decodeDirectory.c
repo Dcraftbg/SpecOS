@@ -7,9 +7,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "include/decodeDirectory.h"
-#include "../utils/include/string.h"
-#include "../utils/include/binop.h"
+#include "decodeDirectory.h"
+#include "../drivers/terminalWrite.h"
+#include "../utils/string.h"
+#include "../utils/binop.h"
 
 // A function that really should be in the string.h utils header, but I can't bother doing it properly
 void splitString(const char *input, char output[10][32]) {
@@ -20,6 +21,11 @@ void splitString(const char *input, char output[10][32]) {
             t++;
         }
     } 
+}
+
+int getBit(unsigned char num, int x) {
+    // Shift 1 x positions to the right and perform bitwise AND with num
+    return (num >> x) & 1;
 }
 
 // Used for skipping long file names
@@ -50,10 +56,8 @@ void parseDirectory(char* rawBinary, struct directoryEntry directoryBuffer[10]) 
     splitString(rawBinary, rawEntries);
     // For each of them, add to directoryBuffer a decoded thingy
     for (int i = 0; i < 10; i++) {
-        if (rawEntries[i][11] == 0x0F) { // If it's a long file name entry, skip it - not supported yet!
-            directoryBuffer[i].isSet = 0;
+        if (rawEntries[i][11] == 0x0F) // If it's a long file name entry, skip it - not supported yet!
             continue;
-        }
         directoryBuffer[i].isSet = (rawEntries[i][0] != '\0');
         // Offset 0: File name
         for (int j = 0; j < 8; j++) {
@@ -82,3 +86,14 @@ void parseDirectory(char* rawBinary, struct directoryEntry directoryBuffer[10]) 
     int listsize = 10;
     processArray(directoryBuffer, &listsize);
 } 
+
+
+
+
+
+
+
+
+
+
+

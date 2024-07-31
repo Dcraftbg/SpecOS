@@ -5,13 +5,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "../include/kernel.h"
-#include "../drivers/include/vga.h"
-#include "include/api.h"
-#include "include/decodeDirectory.h"
-#include "include/readClusterChain.h"
-#include "../drivers/include/disk.h"
-#include "../utils/include/string.h"
+#include "../drivers/terminalWrite.h"
+#include "api.h"
+#include "decodeDirectory.h"
+#include "readClusterChain.h"
+#include "../drivers/disk.h"
+#include "../utils/string.h"
 
 bool checkAllowed(char toCheck) {
     char* allowed = "qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890!@#$%^&*()[]\\-_=+{}|;':\"?.>,<`~";
@@ -63,19 +62,19 @@ void listCurrentDirectory(uint32_t currentDirectoryCluster) {
     struct directoryEntry DEbuffer[10];
     parseDirectory(rawContents, DEbuffer);
     // And finally, print it all out!
-    writestring("\n");
+    terminal_writestring("\n");
     char readableBuffer[12];
     for (int i = 0; i < 10; i++) {
         if (!DEbuffer[i].isSet)
             continue;
         if (DEbuffer[i].isDirectory)
-            kernel.colourOut = 0x339091;
+            terminal_setcolor(VGA_COLOR_CYAN);
         padInputToFilename(DEbuffer[i].filename, readableBuffer);
         for (int c = 0; c < 12; c++) {
-            writestring(charToStr(readableBuffer[c]));
+            terminal_writestring(charToStr(readableBuffer[c]));
         }
-        writestring("\n");
-        kernel.colourOut = 0xFFFFFF;
+        terminal_writestring("\n");
+        terminal_setcolor(VGA_COLOR_WHITE);
     }
 }
 
@@ -110,12 +109,12 @@ struct cd changeDirectorySingle(char child[100], struct cd prevDir) {
                     newDir.cluster = 2; // This is hardcoded just to fix some issues that can happen when cd'ing to the root dir.
                 return newDir;
             } else {
-                writestring("\nError: Not a directory.\n");
+                terminal_writestring("\nError: Not a directory.\n");
                 return prevDir;
             }
         }
     }
-    writestring("\nError: No such file or directory.\n");
+    terminal_writestring("\nError: No such file or directory.\n");
     return prevDir;
 }
 
@@ -131,26 +130,23 @@ char* cat(struct cd prevDir, char child[100], bool doEcho) {
     for (int i = 0; i < 10; i++) {
         if (filenameCompare(child, DEbuffer[i].filename)) {
             // Make sure it's not a folder
-            if (!DEbuffer[i].isDirectory) { 
-                char fileContents[1000000];
-                int status = readFile(DEbuffer[i].firstCluster, fileContents);
-                if (status == 1) {
-                    writestring("\nFile too large to read (max. 1MB)\n");
-                    return "";
-                }
+            if (!DEbuffer[i].isDirectory) {
+                terminal_writestring("\n");
+                char* fileContents;
+                readFile(DEbuffer[i].firstCluster, fileContents);
                 int n = 0;
                 while (1) {
                     if (doEcho)
-                        writestring(charToStr(fileContents[n]));
-                    if (fileContents[++n] == 4 && fileContents[n + 1] == 0 && fileContents[n + 2] == 4) 
+                        terminal_writestring(charToStr(fileContents[n]));
+                    if (fileContents[++n] == 4 && fileContents[n + 1] == 0 && fileContents[n + 2] == 4)
                         return fileContents;
                 }
             } else {
-                writestring("\nError: Is a directory.\n");
+                terminal_writestring("\nError: Is a directory.\n");
             }
         }
     }
-    writestring("\nError: No such file or directory.\n");
+    terminal_writestring("\nError: No such file or directory.\n");
 }
 
 
