@@ -42,13 +42,17 @@ void initVGA() {
     struct limine_framebuffer *framebuffer = framebuffer_request.response->framebuffers[0];
     kernel.screenWidth = framebuffer->width;
     kernel.screenHeight = framebuffer->height;
+    kernel.bpp = framebuffer->bpp;
 }
 
 void drawPix(int x, int y, int colour) {
     struct limine_framebuffer *framebuffer = framebuffer_request.response->framebuffers[0];
     volatile uint32_t *fb_ptr = framebuffer->address;
     // uhh hopefully this'll work but tbh I have no idea.
-    fb_ptr[y * (framebuffer->pitch / 4) + x] = colour;
+    //int pixelWidth = framebuffer->bpp;
+    //fb_ptr[y * (framebuffer->pitch / pixelWidth) + x] = colour;
+    uint32_t* location = (uint32_t*)(((uint8_t*)fb_ptr) + y*framebuffer->pitch);
+    location[x] = colour;
 }
 
 void drawChar(int xOffset, int yOffset, int colour, char ch) {
@@ -74,9 +78,12 @@ void writeChar(char ch, int colour) {
     outCharSerial(ch);
 }
 
+void scrollLine();
+
 void newline() {
     kernel.chY += 16;
     kernel.chX = 5;
+    if (kernel.chY > kernel.screenHeight - 17) scrollLine();
 }
 
 void clearScreen() {
@@ -88,12 +95,33 @@ void clearScreen() {
     kernel.chY = 5;
 }
 
+void scrollPixel(int pixels) {
+    struct limine_framebuffer *framebuffer = framebuffer_request.response->framebuffers[0];
+    volatile uint32_t *fb_ptr = framebuffer->address;
+    for (int y = 0; y <= kernel.screenHeight; y++) {
+        for (int x = 0; x < kernel.screenWidth; x++) {
+            if (y > (kernel.screenHeight - pixels)) {
+                drawPix(x, y, kernel.bgColour);
+                continue;
+            }
+            // get the colour at the pixel the line above
+            uint32_t *location = (uint32_t*)(((uint8_t*)fb_ptr) + (y + pixels) * framebuffer->pitch);
+            uint32_t abovePixelValue = location[x];
+            // draw it at this spot
+            drawPix(x, y, abovePixelValue);
+        }
+    }
+}
+
+void scrollLine() {
+    scrollPixel(33);
+    kernel.chY -= 33;
+}
+
 void writestring(char* str) {
     if (kernel.doPush)
         pushBackLastString(str);
-    // Not rlly doing proper scrolling for now. If it's too big, clear the screen
-    if (kernel.chY >= (kernel.screenHeight / 3) * 2)
-        clearScreen();
+    if (kernel.chY > kernel.screenHeight - 16) scrollLine();
     for (int i = 0; i < strlen(str); i++) {
         /* obvs this makes newline if it reaches a newline char, BUT it also
          * makes a new line if chX + 8 (aka. the end of the next char to be drawn) is more than screenWidth.
@@ -102,7 +130,7 @@ void writestring(char* str) {
             newline();
             outCharSerial('\n');
             continue;
-        } else if (kernel.chX > ((kernel.screenWidth / 3) * 2)) {
+        } else if (kernel.chX > kernel.screenWidth - 5) {
             newline(); // this is a seperate block cos in this case, it shouldn't skip to the next thingy
         }
         writeChar(str[i], kernel.colourOut);

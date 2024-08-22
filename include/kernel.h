@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "../mem/include/paging.h"
 #include "../limine.h"
 
 #ifndef KERNEL_H
@@ -64,6 +65,7 @@ typedef struct {
     int colourOut;
     int screenWidth;
     int screenHeight;
+    int bpp;
     bool doPush; // debug: this should only be false on kernel panic
     char* last10[10]; // debug: last 10 stdio outputs
     struct largestSection largestSect; // info about location of the pmm's bitmap
@@ -73,7 +75,9 @@ typedef struct {
     struct GDTEntry GDT[5]; // global descriptor table
     struct GDTPtr GDTR; // the pointer thingy to the GDT
     struct IDTEntry idt[256]; // the interrupt descriptor table
-    struct idtr IDTPtr; 
+    struct idtr IDTPtr;
+    uint64_t pml4[512] __attribute__((aligned(4096))); 
+    struct limine_kernel_file_response kernelFile; 
 } Kernel;
 
 extern Kernel kernel;

@@ -7,7 +7,6 @@
 #include <stdint.h>
 
 #include "limine.h"
-
 #include "drivers/include/serial.h"
 #include "drivers/include/vga.h"
 #include "sys/include/gdt.h"
@@ -27,6 +26,12 @@
 Kernel kernel = {0};
 
 // get stuff from limine so that other kernel modules can use it
+__attribute__((used, section(".requests")))
+static volatile struct limine_kernel_file_request kernelElfRequest = {
+    .id = LIMINE_KERNEL_FILE_REQUEST,
+    .revision = 0
+};
+
 __attribute__((used, section(".requests")))
 static volatile struct limine_memmap_request memmapRequest = {
     .id = LIMINE_MEMMAP_REQUEST,
@@ -50,6 +55,7 @@ void initKernelData() {
     struct limine_memmap_response memmapResponse = *memmapRequest.response;
     kernel.memmapEntryCount = memmapResponse.entry_count;
     kernel.memmapEntries = memmapResponse.entries;
+    kernel.kernelFile = *kernelElfRequest.response;
 }
 
 void _start() {
@@ -59,24 +65,24 @@ void _start() {
     // Just send output to a serial port to test
     writestring("Trying to initialise GDT...\n");
     initGDT();
-    writestring("\nGDT successfully initialised! (as far as can be told. All I know is that there isn't a gpf.)");
     writestring("\n\nTrying to initialise IDT & everything related...\n");
     initIDT();
     writestring("\nStarting physical memory manager...");
     initPMM();
     // this is commented out cos paging doesn't work yet and it's still in progress.
-    /*writestring("\nInitiating paging...");
-    struct pmlEntry* pml4Address = initPaging(); 
-    printf("\nPages mapped, trying to reload cr3...");
+    writestring("\nInitiating paging...\n");
+    uint64_t* pml4Address = initPaging();
+    /*printf("Pages mapped, trying to reload cr3...");
     // load a pointer to pml4 into cr3 and change the stack to point elsewhere
     __asm__ volatile (
+        "movq %1, %%cr3;"
 //        "movq %0, %%rsp;"
-//        "movq %1, %%rbp;"
-        "movq %1, %%cr3"
+//        "movq %1, %%rbp"
         : : "r" ((uint64_t) 0xfffffffffffff000),
             "r" ((uint64_t) pml4Address)
     );
-    printf("\nPaging successfully enabled!");*/
+    for (;;); // so that it doesn't try do stuff that requires a stack, thus crashing it
+    printf("\nPaging successfully enabled! CR3: 0x%x\n", (uint64_t)pml4Address);*/
     test_userspace();
     for (;;);
 }
